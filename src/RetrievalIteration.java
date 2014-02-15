@@ -8,7 +8,9 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 import org.apache.commons.codec.binary.Base64;
@@ -60,15 +62,55 @@ public class RetrievalIteration {
 		System.out.println("Iteration: "+query.iteration);
 		String content = getContent(query);
 		ArrayList<Doc> docs = content2Doc(content);
+		ArrayList<ArrayList<Integer>> termfreqs = new ArrayList<ArrayList<Integer>>();	//t_{ji}
+		HashMap<String, Integer> docfreq = new LinkedHashMap<String, Integer>(); 	//df_{i}
+		HashMap<String,Integer> termPos = new HashMap<String,Integer>(); 
 		
 		for(int j=0;j<docs.size();j++){
 			TokenStream tokenStream = new LowerCaseTokenizer(Version.LUCENE_46, new StringReader(docs.get(j).summary.toString()));
 			tokenStream = new StopFilter(Version.LUCENE_46, tokenStream, sets);
 			tokenStream.reset();
+			ArrayList<Integer> termfreq = new ArrayList<Integer>(); 
 			while (tokenStream.incrementToken()) {
-				// construct tfij array and dfi map
+				String term = tokenStream.getAttribute(CharTermAttribute.class).toString();
+				// get position of term
+				int pos = 0;
+				if(termPos.containsKey(term)){
+					pos = termPos.get(term); 
+				}
+				else{
+					termPos.put(term,termPos.size());
+					pos = termPos.size();
+				}
+				
+				// add 0 if terms before do not occur
+				while(termfreq.size()<=pos){
+					termfreq.add(0);
+				}
+				
+				// add docfreq for the first occurrence in the document
+				if(termfreq.get(pos)==0){
+					if(docfreq.containsKey(term)){
+						docfreq.put(term, docfreq.get(term)+1);
+					}
+					else{
+						docfreq.put(term, 1);
+					}
+				}
+				
+				termfreq.set(pos, termfreq.get(pos)+1);
+			}
+			tokenStream.close();
+			termfreqs.add(termfreq);
+		}
+		
+		for(ArrayList<Integer> termfreq:termfreqs){
+			while(termfreq.size()<termPos.size()){
+				termfreq.add(0);
 			}
 		}
+		
+		System.out.println("Finished construct frequency tables");
 	}
 	
 	public String getContent(Query query) throws IOException{
