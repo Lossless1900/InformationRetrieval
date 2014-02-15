@@ -44,6 +44,7 @@ public class Driver {
 		System.out.println("Iteration: "+query.iteration);
 		String content = getContent(query);
 		ArrayList<Doc> docs = content2Doc(content);
+		// write iteration logic
 		
 	}
 	
