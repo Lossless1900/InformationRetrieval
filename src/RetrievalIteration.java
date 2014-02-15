@@ -179,4 +179,39 @@ public class RetrievalIteration {
 		}
 		return plainKeywords.toString().trim();
 	}
+	
+	public void quickSortPos(int[] value, int[] pos, int start, int end){
+		if(value==null || pos==null)
+			return;
+		
+		if(end<=start || start<0 || value.length<=0 || pos.length<=0)
+			return;
+		
+		int pivot = value[start];
+		int p=start;
+		int q=start+1;
+		while(q<=end){
+			if(value[q]>=pivot){
+				p++;
+				int temp = value[p];
+				value[p] = value[q];
+				value[q] = temp;
+				
+				temp = pos[p];
+				pos[p] = pos[q];
+				pos[q] = temp;
+			}
+			q++;
+		}
+		int temp = value[p];
+		value[p] = value[start];
+		value[start] = temp;
+		
+		temp = pos[p];
+		pos[p] = pos[start];
+		pos[start] = temp;
+		
+		quickSortPos(value,pos,start,p-1);
+		quickSortPos(value,pos,p+1,end);
+	}
 }
