@@ -1,4 +1,5 @@
 import java.io.IOException;
+import java.util.HashSet;
 
 import org.dom4j.DocumentException;
 
@@ -12,12 +13,15 @@ public class Driver {
 		
 		String accountKey = args[0];
 		double precision = Double.valueOf(args[1]);
-		String keywords = args[2];
+		HashSet<String> keywords = new HashSet<String>();
+		for(String str:args[2].split(" ")){
+			keywords.add(str);
+		}
 		Query query = new Query(keywords,0,accountKey);
 		
 		System.out.println("***************************************");
 		System.out.println("Client key: "+query.accountKey);
-		System.out.println("Query: "+query.keywords);
+		System.out.println("Query: "+args[2]);
 		System.out.println("Precision: "+precision);
 		System.out.println("***************************************");
 		

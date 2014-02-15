@@ -1,12 +1,14 @@
+import java.util.HashSet;
+
 public class Query {
 	double precision;
-	String keywords;
+	HashSet<String> keywords;
 	int iteration;
 	String accountKey;
 
-	public Query(String keywords, double precision, String accountKey) {
+	public Query(HashSet<String> keywords, double precision, String accountKey) {
 		this.precision = precision;
-		this.keywords = keywords.replace(" ", "%20");
+		this.keywords = keywords;
 		this.iteration = 0;
 		this.accountKey = accountKey;
 	}

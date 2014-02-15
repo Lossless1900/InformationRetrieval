@@ -9,8 +9,8 @@ import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 
 import org.apache.commons.codec.binary.Base64;
@@ -29,7 +29,8 @@ import org.dom4j.Element;
 
 public class RetrievalIteration {
 	static CharArraySet stopSet = StopAnalyzer.ENGLISH_STOP_WORDS_SET;
-	static CharArraySet sets = null;	
+	static CharArraySet sets = null;
+	static final int MAX_DOC = 10;
 	
 	public RetrievalIteration(){
 		Object[] rawArray = stopSet.toArray();
@@ -61,7 +62,9 @@ public class RetrievalIteration {
 		query.iteration += 1;
 		System.out.println("Iteration: "+query.iteration);
 		String content = getContent(query);
+		Doc qDoc = new Doc("query","",getPlainText(query.keywords),true);
 		ArrayList<Doc> docs = content2Doc(content);
+		docs.add(qDoc);
 		ArrayList<ArrayList<Integer>> termfreqs = new ArrayList<ArrayList<Integer>>();	//t_{ji}
 		ArrayList<Integer> docfreq = new ArrayList<Integer>(); 							//df_{i}
 		HashMap<String, Integer> termPos = new HashMap<String,Integer>(); 
@@ -81,6 +84,7 @@ public class RetrievalIteration {
 				else{
 					pos = termPos.size();
 					termPos.put(term,termPos.size());
+					docfreq.add(0);
 				}
 				
 				// add 0 if terms before do not occur
@@ -90,9 +94,6 @@ public class RetrievalIteration {
 				
 				// add docfreq for the first occurrence in the document
 				if(termfreq.get(pos)==0){
-					while(docfreq.size()<=pos){
-						docfreq.add(0);
-					}
 					docfreq.set(pos, docfreq.get(pos)+1);
 				}
 				
@@ -108,11 +109,12 @@ public class RetrievalIteration {
 			}
 		}
 		
-		System.out.println("Finished construct frequency tables");
+		System.out.println("Finished construction of frequency tables");
 	}
 	
 	public String getContent(Query query) throws IOException{
-		String bingUrl = "https://api.datamarket.azure.com/Bing/Search/Web?Query=%27" + query.keywords +  "%27&$top=10&$format=Atom";
+		String q  = getPlainText(query.keywords);
+		String bingUrl = "https://api.datamarket.azure.com/Bing/Search/Web?Query=%27" + q.replace(" ", "%20") +  "%27&$top=10&$format=Atom";
 		//Provide your account key here. 
 		String accountKey = query.accountKey;
 		
@@ -161,9 +163,18 @@ public class RetrievalIteration {
 			}
 			
 			// convert content to lower case
-            Doc doc = new Doc(title,url,summary.toLowerCase(),relevant);
+            Doc doc = new Doc(title,url,summary,relevant);
             docs.add(doc);
         }
         return docs;
+	}
+	
+	public String getPlainText(HashSet<String> set){
+		StringBuilder plainKeywords = new StringBuilder();
+		for(String word:set){
+			plainKeywords.append(word);
+			plainKeywords.append(" ");
+		}
+		return plainKeywords.toString().trim();
 	}
 }
