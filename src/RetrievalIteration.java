@@ -110,8 +110,50 @@ public class RetrievalIteration {
 				termfreq.add(0);
 			}
 		}
-		
 		System.out.println("Finished construction of frequency tables");
+		
+		int numOfDocs = termfreqs.size();
+		int numOfTerms = docfreq.size();
+		double weight[][] = new double[numOfDocs][numOfTerms];
+		
+		for(int j = 0; j < numOfDocs; j++)
+			for(int i = 0; i < numOfTerms; i++)
+				weight[j][i] = ((double)termfreqs.get(j).get(i)) * Math.log(docfreq.get(i));
+		
+		double alpha = 1.0;
+		double beta = 0.75;
+		double gamma = 0.15;
+		
+		double modifiedQuery[] = new double[numOfTerms];
+		double sumOfRelev[] = new double[numOfTerms];
+		double sumOfNonrelev[] = new double[numOfTerms];
+		int numOfRelevDocs = 0;
+		for(int j = 0; j < docs.size() - 1; j++)
+		{
+			if(docs.get(j).relevant)
+			{
+				numOfRelevDocs++;
+				for(int i = 0; i < numOfTerms; i++)
+					sumOfRelev[i] += weight[j][i];
+			}
+			else
+			{
+				for(int i = 0; i < numOfTerms; i++)
+					sumOfNonrelev[i] += weight[j][i];
+			}
+		}
+		int numOfNonrelevDocs = numOfDocs - numOfRelevDocs;
+		double temp1 = beta/(double)numOfRelevDocs;
+		double temp2 = gamma/(double)numOfNonrelevDocs;
+		
+		for(int i = 0; i < numOfTerms; i++)
+			modifiedQuery[i] = alpha * weight[numOfDocs-1][i] + temp1 * sumOfRelev[i] - temp2 * sumOfNonrelev[i];
+		
+		int queryPos[] = new int[numOfTerms];
+		for(int i = 0; i < numOfTerms; i++)
+			queryPos[i] = i;
+		
+		quickSortPos(modifiedQuery, queryPos, 0, numOfTerms-1);
 	}
 	
 	public String getContent(Query query) throws IOException{
@@ -180,36 +222,38 @@ public class RetrievalIteration {
 		return plainKeywords.toString().trim();
 	}
 	
-	public void quickSortPos(int[] value, int[] pos, int start, int end){
+	public void quickSortPos(double[] value, int[] pos, int start, int end){
 		if(value==null || pos==null)
 			return;
 		
 		if(end<=start || start<0 || value.length<=0 || pos.length<=0)
 			return;
 		
-		int pivot = value[start];
+		double pivot = value[start];
 		int p=start;
 		int q=start+1;
+		double td = 0;
+		int ti = 0;
 		while(q<=end){
 			if(value[q]>=pivot){
 				p++;
-				int temp = value[p];
+				td = value[p];
 				value[p] = value[q];
-				value[q] = temp;
+				value[q] = td;
 				
-				temp = pos[p];
+				ti = pos[p];
 				pos[p] = pos[q];
-				pos[q] = temp;
+				pos[q] = ti;
 			}
 			q++;
 		}
-		int temp = value[p];
+		td = value[p];
 		value[p] = value[start];
-		value[start] = temp;
+		value[start] = td;
 		
-		temp = pos[p];
+		ti = pos[p];
 		pos[p] = pos[start];
-		pos[start] = temp;
+		pos[start] = ti;
 		
 		quickSortPos(value,pos,start,p-1);
 		quickSortPos(value,pos,p+1,end);
