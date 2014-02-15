@@ -63,8 +63,8 @@ public class RetrievalIteration {
 		String content = getContent(query);
 		ArrayList<Doc> docs = content2Doc(content);
 		ArrayList<ArrayList<Integer>> termfreqs = new ArrayList<ArrayList<Integer>>();	//t_{ji}
-		HashMap<String, Integer> docfreq = new LinkedHashMap<String, Integer>(); 	//df_{i}
-		HashMap<String,Integer> termPos = new HashMap<String,Integer>(); 
+		ArrayList<Integer> docfreq = new ArrayList<Integer>(); 							//df_{i}
+		HashMap<String, Integer> termPos = new HashMap<String,Integer>(); 
 		
 		for(int j=0;j<docs.size();j++){
 			TokenStream tokenStream = new LowerCaseTokenizer(Version.LUCENE_46, new StringReader(docs.get(j).summary.toString()));
@@ -79,8 +79,8 @@ public class RetrievalIteration {
 					pos = termPos.get(term); 
 				}
 				else{
-					termPos.put(term,termPos.size());
 					pos = termPos.size();
+					termPos.put(term,termPos.size());
 				}
 				
 				// add 0 if terms before do not occur
@@ -90,12 +90,10 @@ public class RetrievalIteration {
 				
 				// add docfreq for the first occurrence in the document
 				if(termfreq.get(pos)==0){
-					if(docfreq.containsKey(term)){
-						docfreq.put(term, docfreq.get(term)+1);
+					while(docfreq.size()<=pos){
+						docfreq.add(0);
 					}
-					else{
-						docfreq.put(term, 1);
-					}
+					docfreq.set(pos, docfreq.get(pos)+1);
 				}
 				
 				termfreq.set(pos, termfreq.get(pos)+1);
