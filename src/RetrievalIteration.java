@@ -65,9 +65,10 @@ public class RetrievalIteration {
 		Doc qDoc = new Doc("query","",getPlainText(query.keywords),true);
 		ArrayList<Doc> docs = content2Doc(content);
 		docs.add(qDoc);
-		ArrayList<ArrayList<Integer>> termfreqs = new ArrayList<ArrayList<Integer>>();	//t_{ji}
-		ArrayList<Integer> docfreq = new ArrayList<Integer>(); 							//df_{i}
-		HashMap<String, Integer> termPos = new HashMap<String,Integer>(); 
+		ArrayList<ArrayList<Integer>> termfreqs = new ArrayList<ArrayList<Integer>>();	// t_{ji}
+		ArrayList<Integer> docfreq = new ArrayList<Integer>(); 							// df_{i}
+		HashMap<String, Integer> termPos = new HashMap<String,Integer>(); 				// term -> pos
+		HashMap<Integer,String> posTerm = new HashMap<Integer,String>(); 				// pos -> term
 		
 		for(int j=0;j<docs.size();j++){
 			TokenStream tokenStream = new LowerCaseTokenizer(Version.LUCENE_46, new StringReader(docs.get(j).summary.toString()));
@@ -83,7 +84,8 @@ public class RetrievalIteration {
 				}
 				else{
 					pos = termPos.size();
-					termPos.put(term,termPos.size());
+					termPos.put(term,pos);
+					posTerm.put(pos, term);
 					docfreq.add(0);
 				}
 				
