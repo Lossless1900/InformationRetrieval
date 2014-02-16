@@ -21,6 +21,6 @@ public class Driver {
 		RetrievalIteration iteration = new RetrievalIteration();		
 		do{
 			iteration.startIteration(query);
-		}while(query.precision>0 && query.precision<precision && query.resultCount>0);
+		}while(query.precision>0 && query.precision<query.goalprecision && query.resultCount>0);
 	}
 }
