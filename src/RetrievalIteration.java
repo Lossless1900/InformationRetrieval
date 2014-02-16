@@ -215,7 +215,7 @@ public class RetrievalIteration {
 		}
 		query.resultCount = docs.size()-1;
 		query.keywords = keywords;
-		query.precision = numOfRelevDocs/(docs.size()-1);
+		query.precision = (double)numOfRelevDocs/(double)(docs.size()-1);
 		
 		System.out.println("Finished expanding the query.");
 		System.out.println("***************************************");

@@ -22,5 +22,15 @@ public class Driver {
 		do{
 			iteration.startIteration(query);
 		}while(query.precision>0 && query.precision<query.goalprecision && query.resultCount>0);
+		
+		if(query.precision>=query.goalprecision){
+			System.out.println("Desired precision reached, done.");
+		}
+		else if(query.resultCount==0){
+			System.out.println("No result found, done.");
+		}
+		else if(query.precision==0){
+			System.out.println("No result relevant, done.");
+		}
 	}
 }
