@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 import org.apache.commons.codec.binary.Base64;
@@ -31,6 +32,9 @@ public class RetrievalIteration {
 	static CharArraySet stopSet = StopAnalyzer.ENGLISH_STOP_WORDS_SET;
 	static CharArraySet sets = null;
 	static final int MAX_DOC = 10;
+	static final double alpha = 1.0;
+	static final double beta = 0.75;
+	static final double gamma = 0.15;
 	
 	public RetrievalIteration(){
 		Object[] rawArray = stopSet.toArray();
@@ -54,15 +58,21 @@ public class RetrievalIteration {
 				"down","in","out","on","off","over","under","again","further","then","once","here","there",
 				"when","where","why","how","all","any","both","each","few","more","most","other","some",
 				"such","no","nor","not","only","own","same","so","than","too","very","say","says","said",
-				"shall","a","fuck","shit","bitch");
+				"shall","a","fuck","shit","bitch","s","ve");
 		sets.addAll(stopWords);
 	}
 	
 	public void startIteration(Query query) throws IOException, DocumentException{
 		query.iteration += 1;
+		System.out.println("***************************************");
+		System.out.println("Client key: "+query.accountKey);
+		System.out.println("Query: "+ getPlainText(query.keywords));
+		System.out.println("Current Precision: "+query.precision);
+		System.out.println("Goal Precision: "+query.goalprecision);
+		System.out.println("***************************************");
 		System.out.println("Iteration: "+query.iteration);
 		String content = getContent(query);
-		Doc qDoc = new Doc("query","",getPlainText(query.keywords),true);
+		Doc qDoc = new Doc("query","",getPlainText(query.keywords).toLowerCase(),true);
 		ArrayList<Doc> docs = content2Doc(content);
 		docs.add(qDoc);
 		ArrayList<ArrayList<Integer>> termfreqs = new ArrayList<ArrayList<Integer>>();	// t_{ji}
@@ -77,6 +87,7 @@ public class RetrievalIteration {
 			ArrayList<Integer> termfreq = new ArrayList<Integer>(); 
 			while (tokenStream.incrementToken()) {
 				String term = tokenStream.getAttribute(CharTermAttribute.class).toString();
+//				System.out.println(term);
 				// get position of term
 				int pos = 0;
 				if(termPos.containsKey(term)){
@@ -110,7 +121,8 @@ public class RetrievalIteration {
 				termfreq.add(0);
 			}
 		}
-		System.out.println("Finished construction of frequency tables");
+		
+		System.out.println("Finished construction of frequency tables.");
 		
 		int numOfDocs = termfreqs.size();
 		int numOfTerms = docfreq.size();
@@ -118,17 +130,13 @@ public class RetrievalIteration {
 		
 		for(int j = 0; j < numOfDocs; j++)
 			for(int i = 0; i < numOfTerms; i++)
-				weight[j][i] = ((double)termfreqs.get(j).get(i)) * Math.log(docfreq.get(i));
-		
-		double alpha = 1.0;
-		double beta = 0.75;
-		double gamma = 0.15;
+				weight[j][i] = ((double)termfreqs.get(j).get(i)) * Math.log((double)docs.size()/(double)docfreq.get(i));
 		
 		double modifiedQuery[] = new double[numOfTerms];
 		double sumOfRelev[] = new double[numOfTerms];
 		double sumOfNonrelev[] = new double[numOfTerms];
 		int numOfRelevDocs = 0;
-		for(int j = 0; j < docs.size() - 1; j++)
+		for(int j = 0; j < docs.size() - 1; j++)		// exclude the last document: query
 		{
 			if(docs.get(j).relevant)
 			{
@@ -142,18 +150,75 @@ public class RetrievalIteration {
 					sumOfNonrelev[i] += weight[j][i];
 			}
 		}
-		int numOfNonrelevDocs = numOfDocs - numOfRelevDocs;
+		int numOfNonrelevDocs = numOfDocs -1 - numOfRelevDocs;
 		double temp1 = beta/(double)numOfRelevDocs;
 		double temp2 = gamma/(double)numOfNonrelevDocs;
 		
-		for(int i = 0; i < numOfTerms; i++)
+		for(int i = 0; i < numOfTerms; i++){
 			modifiedQuery[i] = alpha * weight[numOfDocs-1][i] + temp1 * sumOfRelev[i] - temp2 * sumOfNonrelev[i];
+			if(modifiedQuery[i]<0)
+				modifiedQuery[i]=0;
+		}
 		
 		int queryPos[] = new int[numOfTerms];
 		for(int i = 0; i < numOfTerms; i++)
 			queryPos[i] = i;
 		
+		double[] modifiedQueryOrdered = modifiedQuery.clone();
 		quickSortPos(modifiedQuery, queryPos, 0, numOfTerms-1);
+		
+//		System.out.println("Expansion: ");
+//		for(int i=0;i<queryPos.length;i++){
+//			System.out.println(posTerm.get(queryPos[i]));
+//		}
+		
+		// Expand query keywords
+		query.resultCount = docs.size()-1;
+		int i=0;
+		int size = query.keywords.size();
+		while(query.keywords.size()<size+2 && i<modifiedQuery.length){
+			String newword = posTerm.get(queryPos[i]);
+			boolean exist = false;
+			for(String keyword:query.keywords){
+				if(keyword.toLowerCase().contains(newword)){
+					exist=true;
+					break;
+				}
+			}
+			if(!exist)
+				query.keywords.add(newword);
+			i++;
+		}
+		
+		// Reorder query keywords
+		double[] keywordWeight = new double[query.keywords.size()];
+		int[] keywordPos = new int[query.keywords.size()];
+		int j=0;
+		for(String keyword:query.keywords){
+			int pos = findPos(keyword,termPos);
+			if(pos==-1){
+				keywordWeight[j]=0;
+			}
+			else{
+				keywordWeight[j]=modifiedQueryOrdered[pos];
+			}
+			j++;
+		}
+		for(i=0;i<query.keywords.size();i++){
+			keywordPos[i]=i;
+		}
+		quickSortPos(keywordWeight, keywordPos, 0, query.keywords.size()-1);
+		
+		// Construct new keywords set
+		ArrayList<String> keywords= new ArrayList<String>();
+		for(i=0;i<query.keywords.size();i++){
+			keywords.add(query.keywords.get(keywordPos[i]));
+		}
+		query.keywords = keywords;
+		
+		System.out.println("Finished expanding the query.");
+		System.out.println("***************************************");
+		System.out.print("Iteration "+query.iteration+" Finished.");
 	}
 	
 	public String getContent(Query query) throws IOException{
@@ -207,13 +272,13 @@ public class RetrievalIteration {
 			}
 			
 			// convert content to lower case
-            Doc doc = new Doc(title,url,summary,relevant);
+            Doc doc = new Doc(title,url,summary.toLowerCase(),relevant);
             docs.add(doc);
         }
         return docs;
 	}
 	
-	public String getPlainText(HashSet<String> set){
+	public String getPlainText(ArrayList<String> set){
 		StringBuilder plainKeywords = new StringBuilder();
 		for(String word:set){
 			plainKeywords.append(word);
@@ -257,5 +322,19 @@ public class RetrievalIteration {
 		
 		quickSortPos(value,pos,start,p-1);
 		quickSortPos(value,pos,p+1,end);
+	}
+	
+	public int findPos(String keyword,HashMap<String, Integer> termPos){
+		if(termPos.containsKey(keyword.toLowerCase())){
+			return termPos.get(keyword.toLowerCase());
+		}
+		else{
+			for(String term:termPos.keySet()){
+				if(keyword.toLowerCase().contains(term)){
+					return termPos.get(term);
+				}
+			}
+		}
+		return -1;
 	}
 }

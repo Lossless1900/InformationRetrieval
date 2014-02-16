@@ -1,15 +1,19 @@
-import java.util.HashSet;
+import java.util.ArrayList;
 
 public class Query {
 	double precision;
-	HashSet<String> keywords;
+	double goalprecision;
+	ArrayList<String> keywords;
 	int iteration;
 	String accountKey;
+	int resultCount = 0;
 
-	public Query(HashSet<String> keywords, double precision, String accountKey) {
+	public Query(ArrayList<String> keywords, double precision, double goalprecision, String accountKey) {
 		this.precision = precision;
 		this.keywords = keywords;
-		this.iteration = 0;
 		this.accountKey = accountKey;
+		this.goalprecision = goalprecision;
+		this.iteration = 0;
+		this.resultCount = 0;
 	}
 }
