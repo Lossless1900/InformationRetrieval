@@ -22,10 +22,12 @@ import org.apache.lucene.analysis.core.StopFilter;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.analysis.util.CharArraySet;
 import org.apache.lucene.util.Version;
+import org.tartarus.snowball.ext.PorterStemmer;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.DocumentHelper;
 import org.dom4j.Element;
+
 
 
 public class RetrievalIteration {
@@ -35,6 +37,7 @@ public class RetrievalIteration {
 	static final double alpha = 1.0;
 	static final double beta = 0.75;
 	static final double gamma = 0.15;
+	PorterStemmer stemmer = new PorterStemmer();
 	
 	public RetrievalIteration(){
 		Object[] rawArray = stopSet.toArray();
@@ -86,7 +89,10 @@ public class RetrievalIteration {
 			tokenStream.reset();
 			ArrayList<Integer> termfreq = new ArrayList<Integer>(); 
 			while (tokenStream.incrementToken()) {
-				String term = tokenStream.getAttribute(CharTermAttribute.class).toString();
+				String word = tokenStream.getAttribute(CharTermAttribute.class).toString();
+				stemmer.setCurrent(word);
+				stemmer.stem();
+			    String term = stemmer.getCurrent();
 //				System.out.println(term);
 				// get position of term
 				int pos = 0;
@@ -124,6 +130,7 @@ public class RetrievalIteration {
 		
 		System.out.println("Finished construction of frequency tables.");
 		
+		// Calculate weight of terms for docs
 		int numOfDocs = termfreqs.size();
 		int numOfTerms = docfreq.size();
 		double weight[][] = new double[numOfDocs][numOfTerms];
@@ -213,6 +220,8 @@ public class RetrievalIteration {
 		for(i=0;i<query.keywords.size();i++){
 			keywords.add(query.keywords.get(keywordPos[i]));
 		}
+		
+		// Update query status
 		query.resultCount = docs.size()-1;
 		query.keywords = keywords;
 		query.precision = (double)numOfRelevDocs/(double)(docs.size()-1);
