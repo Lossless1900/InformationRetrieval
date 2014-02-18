@@ -9,9 +9,7 @@ import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.List;
 
 import org.apache.commons.codec.binary.Base64;
@@ -228,7 +226,7 @@ public class RetrievalIteration {
 		
 		System.out.println("Finished expanding the query.");
 		System.out.println("***************************************");
-		System.out.print("Iteration "+query.iteration+" Finished.");
+		System.out.println("Iteration "+query.iteration+" Finished.");
 	}
 	
 	public String getContent(Query query) throws IOException{
