@@ -25,16 +25,18 @@ import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.DocumentHelper;
 import org.dom4j.Element;
+import org.jsoup.Jsoup;
+import org.jsoup.select.Elements;
 
 
 
 public class RetrievalIteration {
 	static CharArraySet stopSet = StopAnalyzer.ENGLISH_STOP_WORDS_SET;
 	static CharArraySet sets = null;
-	static final int MAX_DOC = 10;
 	static final double alpha = 1.0;
 	static final double beta = 0.75;
 	static final double gamma = 0.15;
+	static final double MAX_WEIGHT = 5000;
 	PorterStemmer stemmer = new PorterStemmer();
 	
 	public RetrievalIteration(){
@@ -59,11 +61,11 @@ public class RetrievalIteration {
 				"down","in","out","on","off","over","under","again","further","then","once","here","there",
 				"when","where","why","how","all","any","both","each","few","more","most","other","some",
 				"such","no","nor","not","only","own","same","so","than","too","very","say","says","said",
-				"shall","a","fuck","shit","bitch","s","ve");
+				"shall","a","fuck","shit","bitch","s","ve","lets","days","ago","retrieved");
 		sets.addAll(stopWords);
 	}
 	
-	public void startIteration(Query query) throws IOException, DocumentException{
+	public void startIteration(Query query) throws IOException,DocumentException{
 		query.iteration += 1;
 		System.out.println("***************************************");
 		System.out.println("Client key: "+query.accountKey);
@@ -76,61 +78,109 @@ public class RetrievalIteration {
 		Doc qDoc = new Doc("query","",getPlainText(query.keywords).toLowerCase(),true);
 		ArrayList<Doc> docs = content2Doc(content);
 		docs.add(qDoc);
-		ArrayList<ArrayList<Integer>> termfreqs = new ArrayList<ArrayList<Integer>>();	// t_{ji}
+		ArrayList<ArrayList<Double>> termfreqs = new ArrayList<ArrayList<Double>>();	// t_{ji}
 		ArrayList<Integer> docfreq = new ArrayList<Integer>(); 							// df_{i}
 		HashMap<String, Integer> termPos = new HashMap<String,Integer>(); 				// term -> pos
 		HashMap<Integer,String> posTerm = new HashMap<Integer,String>(); 				// pos -> term
 		
+		// ConstructFreqTable(docs, docfreq, termfreqs, termPos, posTerm);
+		// Tuning parameters......
 		for(int j=0;j<docs.size();j++){
-			TokenStream tokenStream = new LowerCaseTokenizer(Version.LUCENE_46, new StringReader(docs.get(j).summary.toString()));
-			tokenStream = new StopFilter(Version.LUCENE_46, tokenStream, sets);
-			tokenStream.reset();
-			ArrayList<Integer> termfreq = new ArrayList<Integer>(); 
-			while (tokenStream.incrementToken()) {
-				String word = tokenStream.getAttribute(CharTermAttribute.class).toString();
-				stemmer.setCurrent(word);
-				stemmer.stem();
-			    String term = stemmer.getCurrent();
-//				System.out.println(term);
-				// get position of term
-				int pos = 0;
-				if(termPos.containsKey(term)){
-					pos = termPos.get(term); 
+			ArrayList<String> docContents = new ArrayList<String>();
+			ArrayList<Double> weights = new ArrayList<Double>();
+			double aw = 1.0;
+			if(docs.get(j).relevant==true){
+				aw = 1.0;
+				String url = docs.get(j).url;
+				if(!url.startsWith("http")){
+					url = "http://"+docs.get(j).url;
 				}
-				else{
-					pos = termPos.size();
-					termPos.put(term,pos);
-					posTerm.put(pos, term);
-					docfreq.add(0);
+				try{
+					org.jsoup.nodes.Document doc = Jsoup.connect(url).get();
+					StringBuilder sb = new StringBuilder(doc.body().text());
+					Elements elements = doc.getAllElements();
+					int length = sb.toString().split(" ").length;
+					for(org.jsoup.nodes.Element element : elements){
+						int found = 0;
+						for(String str:query.keywords){
+							if(element.text().contains(str)){
+								found++;
+							}
+						}
+						if(found>query.keywords.size()/2){
+							docContents.add(element.text());
+							weights.add((double) docs.get(j).summary.toString().split(" ").length/(double) length);
+							continue;
+						}
+					}
+					//System.out.print(sb.toString());
 				}
-				
-				// add 0 if terms before do not occur
-				while(termfreq.size()<=pos){
-					termfreq.add(0);
+				catch(Exception e){
+					//System.out.println(e);
 				}
-				
-				// add docfreq for the first occurrence in the document
-				if(termfreq.get(pos)==0){
-					docfreq.set(pos, docfreq.get(pos)+1);
-				}
-				
-				termfreq.set(pos, termfreq.get(pos)+1);
 			}
-			tokenStream.close();
+			docContents.add(docs.get(j).summary.toString());
+			weights.add(aw);
+			
+			ArrayList<Double> termfreq = new ArrayList<Double>();
+			for(int i=0;i<docContents.size();i++){
+				String docContent = docContents.get(i);
+				double tw = weights.get(i);
+				TokenStream tokenStream = new LowerCaseTokenizer(Version.LUCENE_46, new StringReader(docContent));
+				tokenStream = new StopFilter(Version.LUCENE_46, tokenStream, sets);
+				tokenStream.reset();
+				while (tokenStream.incrementToken()) {
+					String term = tokenStream.getAttribute(CharTermAttribute.class).toString();
+//					String term = word;
+//					if(word.length()>4){
+//						stemmer.setCurrent(word);
+//						stemmer.stem();
+//					    term = stemmer.getCurrent();
+//					}
+					
+					// get position of term
+					int pos = 0;
+					if(termPos.containsKey(term)){
+						pos = termPos.get(term); 
+					}
+					else{
+						pos = termPos.size();
+						termPos.put(term,pos);
+						posTerm.put(pos, term);
+						docfreq.add(0);
+					}
+					
+					// add 0 if terms before do not occur
+					while(termfreq.size()<=pos){
+						termfreq.add(0.0);
+					}
+					
+					// add docfreq for the first occurrence in the document
+					if(termfreq.get(pos)==0){
+						docfreq.set(pos, docfreq.get(pos)+1);
+					}
+					
+					termfreq.set(pos, termfreq.get(pos)+tw);
+				}
+				tokenStream.close();
+			}
+			
 			termfreqs.add(termfreq);
-		}
-		
-		for(ArrayList<Integer> termfreq:termfreqs){
-			while(termfreq.size()<termPos.size()){
-				termfreq.add(0);
+			
+			for(ArrayList<Double> tf:termfreqs){
+				while(tf.size()<termPos.size()){
+					tf.add(0.0);
+				}
 			}
 		}
 		
 		System.out.println("Finished construction of frequency tables.");
 		
+		
 		// Calculate weight of terms for docs
 		int numOfDocs = termfreqs.size();
 		int numOfTerms = docfreq.size();
+		//System.out.println(numOfTerms);
 		double weight[][] = new double[numOfDocs][numOfTerms];
 		
 		for(int j = 0; j < numOfDocs; j++)
@@ -173,16 +223,20 @@ public class RetrievalIteration {
 		quickSortPos(modifiedQuery, queryPos, 0, numOfTerms-1);
 		
 //		System.out.println("Expansion: ");
-//		for(int i=0;i<queryPos.length;i++){
-//			System.out.println(posTerm.get(queryPos[i]));
+//		for(int i=0;i<30;i++){
+//			System.out.println(posTerm.get(queryPos[i])+" "+modifiedQuery[i]);
 //		}
 		
 		// Expand query keywords
 		int i=0;
 		int size = query.keywords.size();
 		while(query.keywords.size()<size+2 && i<modifiedQuery.length){
+			if(modifiedQuery[i]>MAX_WEIGHT){
+				i++;
+				continue;
+			}
 			String newword = posTerm.get(queryPos[i]);
-			boolean exist = false;
+			boolean  exist = false;
 			for(String keyword:query.keywords){
 				if(keyword.toLowerCase().contains(newword)){
 					exist=true;
@@ -261,7 +315,7 @@ public class RetrievalIteration {
             Element entry = (Element) i.next();
             List<Element> elist = entry.element("content").element("properties").elements();
             String title = (String) elist.get(1).getData();
-            String summary = (String) elist.get(2).getData();
+            String summary = (String) elist.get(2).getData()+" "+elist.get(1).getData();
             String url = (String) elist.get(3).getData();
             int count = docs.size()+1;
             
