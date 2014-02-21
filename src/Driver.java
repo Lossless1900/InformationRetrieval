@@ -11,7 +11,6 @@ public class Driver {
 			return;
 		}
 		
-//		args[2] = "columbia";
 		String accountKey = args[0];
 		double precision = Double.valueOf(args[1]);
 		ArrayList<String> keywords = new ArrayList<String>();
@@ -23,6 +22,8 @@ public class Driver {
 		do{
 			iteration.startIteration(query);
 		}while(query.precision>0 && query.precision<query.goalprecision && query.resultCount>0);
+		
+		System.out.println("Current Precision: "+query.precision);
 		
 		if(query.precision>=query.goalprecision){
 			System.out.println("Desired precision reached, done.");

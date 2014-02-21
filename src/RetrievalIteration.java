@@ -232,10 +232,10 @@ public class RetrievalIteration {
 		
 		quickSortPos(modifiedQuery, queryPos, 0, numOfTerms-1);
 		
-		System.out.println("Expansion: ");
-		for(int i=0;i<10;i++){
-			System.out.println(posTerm.get(queryPos[i])+" "+modifiedQuery[i]);
-		}
+//		System.out.println("Expansion: ");
+//		for(int i=0;i<10;i++){
+//			System.out.println(posTerm.get(queryPos[i])+" "+modifiedQuery[i]);
+//		}
 		
 		// Expand query keywords
 		int i=0;
