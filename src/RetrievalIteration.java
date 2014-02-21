@@ -79,6 +79,15 @@ public class RetrievalIteration {
 		String content = getContent(query);
 		Doc qDoc = new Doc("query","",getPlainText(query.keywords).toLowerCase(),true);
 		ArrayList<Doc> docs = content2Doc(content);
+		int rd = 0;
+		for(Doc doc:docs){
+			if(doc.relevant==true)
+				rd++;
+		}
+		query.precision = (double) rd/(double) docs.size();
+		if(query.precision>=query.goalprecision || query.precision==0)
+			return;
+		
 		docs.add(qDoc);
 		ArrayList<ArrayList<Double>> termfreqs = new ArrayList<ArrayList<Double>>();	// t_{ji}
 		ArrayList<Integer> docfreq = new ArrayList<Integer>(); 							// df_{i}
@@ -111,7 +120,7 @@ public class RetrievalIteration {
 						}
 						if(found>query.keywords.size()/2){
 							docContents.add(element.text().toLowerCase());
-							weights.add((double) docs.get(j).summary.toString().split(" ").length/(double) length);
+							weights.add(0.5*(double) docs.get(j).summary.split(" ").length/(double) length);
 							continue;
 						}
 					}
@@ -121,7 +130,7 @@ public class RetrievalIteration {
 //					System.out.println(e);
 				}
 			}
-			docContents.add(docs.get(j).summary.toString());
+			docContents.add(docs.get(j).summary);
 			weights.add(aw);
 			
 			ArrayList<Double> termfreq = new ArrayList<Double>();
@@ -223,10 +232,10 @@ public class RetrievalIteration {
 		
 		quickSortPos(modifiedQuery, queryPos, 0, numOfTerms-1);
 		
-//		System.out.println("Expansion: ");
-//		for(int i=0;i<10;i++){
-//			System.out.println(posTerm.get(queryPos[i])+" "+modifiedQuery[i]);
-//		}
+		System.out.println("Expansion: ");
+		for(int i=0;i<10;i++){
+			System.out.println(posTerm.get(queryPos[i])+" "+modifiedQuery[i]);
+		}
 		
 		// Expand query keywords
 		int i=0;
@@ -360,7 +369,7 @@ public class RetrievalIteration {
 			}
 			
 			// convert content to lower case
-            Doc doc = new Doc(title,url,summary.toLowerCase(),relevant);
+            Doc doc = new Doc(title.toLowerCase(),url,summary.toLowerCase(),relevant);
             docs.add(doc);
         }
         return docs;
