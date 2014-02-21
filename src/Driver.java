@@ -11,6 +11,7 @@ public class Driver {
 			return;
 		}
 		
+//		args[2] = "columbia";
 		String accountKey = args[0];
 		double precision = Double.valueOf(args[1]);
 		ArrayList<String> keywords = new ArrayList<String>();

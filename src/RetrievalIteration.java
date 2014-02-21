@@ -11,6 +11,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.lucene.analysis.TokenStream;
@@ -61,7 +63,7 @@ public class RetrievalIteration {
 				"down","in","out","on","off","over","under","again","further","then","once","here","there",
 				"when","where","why","how","all","any","both","each","few","more","most","other","some",
 				"such","no","nor","not","only","own","same","so","than","too","very","say","says","said",
-				"shall","a","fuck","shit","bitch","s","ve","lets","days","ago","retrieved");
+				"shall","a","fuck","shit","bitch","s","ve","lets","days","ago","retrieved","retweeted","tweeted");
 		sets.addAll(stopWords);
 	}
 	
@@ -97,18 +99,18 @@ public class RetrievalIteration {
 				}
 				try{
 					org.jsoup.nodes.Document doc = Jsoup.connect(url).get();
-					StringBuilder sb = new StringBuilder(doc.body().text());
 					Elements elements = doc.getAllElements();
-					int length = sb.toString().split(" ").length;
+					docs.get(j).fulltext = doc.body().text().toLowerCase();
+					int length = doc.body().text().split(" ").length;
 					for(org.jsoup.nodes.Element element : elements){
 						int found = 0;
 						for(String str:query.keywords){
-							if(element.text().contains(str)){
+							if(element.text().toLowerCase().contains(str)){
 								found++;
 							}
 						}
 						if(found>query.keywords.size()/2){
-							docContents.add(element.text());
+							docContents.add(element.text().toLowerCase());
 							weights.add((double) docs.get(j).summary.toString().split(" ").length/(double) length);
 							continue;
 						}
@@ -116,7 +118,7 @@ public class RetrievalIteration {
 					//System.out.print(sb.toString());
 				}
 				catch(Exception e){
-					//System.out.println(e);
+//					System.out.println(e);
 				}
 			}
 			docContents.add(docs.get(j).summary.toString());
@@ -185,7 +187,7 @@ public class RetrievalIteration {
 		
 		for(int j = 0; j < numOfDocs; j++)
 			for(int i = 0; i < numOfTerms; i++)
-				weight[j][i] = ((double)termfreqs.get(j).get(i)) * Math.log((double)docs.size()/(double)docfreq.get(i));
+				weight[j][i] = ((double)termfreqs.get(j).get(i)) * Math.log10((double)docs.size()/(double)docfreq.get(i));
 		
 		double modifiedQuery[] = new double[numOfTerms];
 		double sumOfRelev[] = new double[numOfTerms];
@@ -219,11 +221,10 @@ public class RetrievalIteration {
 		for(int i = 0; i < numOfTerms; i++)
 			queryPos[i] = i;
 		
-		double[] modifiedQueryOrdered = modifiedQuery.clone();
 		quickSortPos(modifiedQuery, queryPos, 0, numOfTerms-1);
 		
 //		System.out.println("Expansion: ");
-//		for(int i=0;i<30;i++){
+//		for(int i=0;i<10;i++){
 //			System.out.println(posTerm.get(queryPos[i])+" "+modifiedQuery[i]);
 //		}
 		
@@ -238,7 +239,7 @@ public class RetrievalIteration {
 			String newword = posTerm.get(queryPos[i]);
 			boolean  exist = false;
 			for(String keyword:query.keywords){
-				if(keyword.toLowerCase().contains(newword)){
+				if(keyword.toLowerCase().contains(newword) || newword.contains(keyword)){
 					exist=true;
 					break;
 				}
@@ -251,19 +252,44 @@ public class RetrievalIteration {
 		// Reorder query keywords
 		double[] keywordWeight = new double[query.keywords.size()];
 		int[] keywordPos = new int[query.keywords.size()];
-		int j=0;
-		for(String keyword:query.keywords){
-			int pos = findPos(keyword,termPos);
-			if(pos==-1){
-				keywordWeight[j]=0;
-			}
-			else{
-				keywordWeight[j]=modifiedQueryOrdered[pos];
-			}
-			j++;
-		}
 		for(i=0;i<query.keywords.size();i++){
 			keywordPos[i]=i;
+		}
+		for(int k=0;k<docs.size();k++){
+			// initialization
+			double[] currentWeight = new double[query.keywords.size()];
+			Arrays.fill(currentWeight, Integer.MAX_VALUE);
+			int[] currentPos = new int[query.keywords.size()];
+			for(i=0;i<query.keywords.size();i++){
+				currentPos[i]=i;
+			}
+			
+			boolean found = true;			
+			// order terms in a doc to occurrence
+			for(int j=0;j<query.keywords.size();j++){
+				String keyword = query.keywords.get(j);
+				Pattern p = Pattern.compile(keyword.toLowerCase());
+				Matcher matcher = p.matcher(docs.get(k).fulltext);
+				
+				if(matcher.find()){
+					found = true;
+					currentWeight[j]=matcher.start();
+				}
+			}
+			quickSortPos(currentWeight, currentPos, 0, currentPos.length-1);
+			
+			// add to cumulative order, later order has small weight;
+			if(found==true){
+				int count = 1;
+				for(int j=0;j<currentPos.length;j++){
+					if(currentWeight[currentPos[j]]!=Integer.MAX_VALUE){
+						keywordWeight[currentPos[j]] += count;
+						count++;
+					}
+					else
+						keywordWeight[currentPos[j]] += 2*currentPos.length;
+				}
+			}
 		}
 		quickSortPos(keywordWeight, keywordPos, 0, query.keywords.size()-1);
 		
@@ -316,13 +342,13 @@ public class RetrievalIteration {
             List<Element> elist = entry.element("content").element("properties").elements();
             String title = (String) elist.get(1).getData();
             String summary = (String) elist.get(2).getData()+" "+elist.get(1).getData();
-            String url = (String) elist.get(3).getData();
+            String url = (String) elist.get(4).getData();
             int count = docs.size()+1;
             
             System.out.println("============================================");
             System.out.println("Result "+ count);
             System.out.println("Title: "+title);
-            System.out.println("Url:"+ url);
+            System.out.println("Url: "+ url);
             System.out.println("Summary: "+summary);
             System.out.println("============================================");
             
